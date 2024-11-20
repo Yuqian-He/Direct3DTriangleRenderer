@@ -1,0 +1,5 @@
+#include <d3d12.h>
+
+void test() {
+    D3D12_ROOT_SIGNATURE_VERSION version = D3D12_ROOT_SIGNATURE_VERSION_1;  // 测试 D3D12_ROOT_SIGNATURE_VERSION_1 是否可用
+}
