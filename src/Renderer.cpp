@@ -6,6 +6,7 @@
 #include <d3d12sdklayers.h>
 #include <wrl.h>
 #include "d3dx12.h"
+#include <filesystem>
 
 using namespace Microsoft::WRL;
 using Microsoft::WRL::ComPtr;
@@ -129,61 +130,66 @@ void Renderer::CreateDescriptorHeaps()
     }
 }
 
+std::wstring Renderer::GetShaderPath(const std::wstring& shaderName) const
+{
+    wchar_t buffer[MAX_PATH];
+    GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+    std::wstring exePath = buffer;
+    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+    std::filesystem::path projectRoot = exeDir.parent_path().parent_path(); // 返回到项目根目录
+
+    std::filesystem::path shaderPath = projectRoot / L"shaders" / shaderName;
+    return shaderPath.wstring();
+}
+
+void Renderer::CompileShaderFromFile(
+    const std::wstring& shaderPath, 
+    const std::string& entryPoint, 
+    const std::string& target, 
+    Microsoft::WRL::ComPtr<ID3DBlob>& shaderBlob, 
+    Microsoft::WRL::ComPtr<ID3DBlob>& errorBlob)
+{
+    HRESULT hr = D3DCompileFromFile(
+        shaderPath.c_str(),
+        nullptr,  // 自定义宏定义
+        nullptr,  // 自定义 include 文件
+        entryPoint.c_str(),  // 着色器的入口函数名
+        target.c_str(),      // 编译目标模型
+        D3DCOMPILE_ENABLE_STRICTNESS, // 启用严格模式
+        0, // 默认编译标志
+        &shaderBlob,
+        &errorBlob
+    );
+
+    if (FAILED(hr)) {
+        if (errorBlob) {
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        throw std::runtime_error("Failed to compile shader from file: " + std::string(shaderPath.begin(), shaderPath.end()));
+    }
+}
 
 void Renderer::LoadShaders()
 {
-    // 着色器文件的路径
-    const std::wstring vertexShaderPath = L"D:\\Personal Project\\Direct3D12Renderer\\shaders\\vertex_shader.hlsl";
-    const std::wstring pixelShaderPath = L"D:\\Personal Project\\Direct3D12Renderer\\shaders\\pixel_shader.hlsl";
+    // 获取相对路径的着色器文件路径
+    const std::wstring vertexShaderPath = GetShaderPath(L"vertex_shader.hlsl");
+    const std::wstring pixelShaderPath = GetShaderPath(L"pixel_shader.hlsl");
 
     // 编译顶点着色器
     Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderBlob;
     Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderErrorBlob;
-    HRESULT hr = D3DCompileFromFile(
-        vertexShaderPath.c_str(),
-        nullptr,  // 可以传递自定义的宏定义
-        nullptr,  // 传递自定义的 include 文件
-        "main",   // 着色器的入口函数名
-        "vs_5_0", // 指定编译目标模型
-        D3DCOMPILE_ENABLE_STRICTNESS, // 启用严格模式
-        0, // 默认编译标志
-        &vertexShaderBlob,
-        &vertexShaderErrorBlob
-    );
-
-    if (FAILED(hr)) {
-        if (vertexShaderErrorBlob) {
-            OutputDebugStringA((char*)vertexShaderErrorBlob->GetBufferPointer());
-        }
-        throw std::runtime_error("Failed to compile vertex shader");
-    }
+    CompileShaderFromFile(vertexShaderPath, "main", "vs_5_0", vertexShaderBlob, vertexShaderErrorBlob);
 
     // 编译像素着色器
     Microsoft::WRL::ComPtr<ID3DBlob> pixelShaderBlob;
     Microsoft::WRL::ComPtr<ID3DBlob> pixelShaderErrorBlob;
-    hr = D3DCompileFromFile(
-        pixelShaderPath.c_str(),
-        nullptr,  // 可以传递自定义的宏定义
-        nullptr,  // 传递自定义的 include 文件
-        "main",   // 着色器的入口函数名
-        "ps_5_0", // 指定编译目标模型
-        D3DCOMPILE_ENABLE_STRICTNESS, // 启用严格模式
-        0, // 默认编译标志
-        &pixelShaderBlob,
-        &pixelShaderErrorBlob
-    );
-
-    if (FAILED(hr)) {
-        if (pixelShaderErrorBlob) {
-            OutputDebugStringA((char*)pixelShaderErrorBlob->GetBufferPointer());
-        }
-        throw std::runtime_error("Failed to compile pixel shader");
-    }
+    CompileShaderFromFile(pixelShaderPath, "main", "ps_5_0", pixelShaderBlob, pixelShaderErrorBlob);
 
     // 将编译后的着色器保存到成员变量中
     m_vertexShader = vertexShaderBlob;
     m_pixelShader = pixelShaderBlob;
 }
+
 
 
 void Renderer::CreateRootSignature()
@@ -325,9 +331,6 @@ void Renderer::WaitForGpu()
 
     m_fenceValue++;
 }
-
-
-
 
 void Renderer::CreateCommandList()
 {

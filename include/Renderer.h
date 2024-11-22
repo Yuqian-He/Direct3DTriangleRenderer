@@ -28,6 +28,7 @@ public:
     void ExecuteCommandList();
     void WaitForGpu();
     void CreateFence();
+    std::wstring GetShaderPath(const std::wstring& shaderName) const;
 
 private:
     UINT m_width = 800;  // 窗口宽度
@@ -37,6 +38,13 @@ private:
     void CreateDevice();
     void CreateCommandQueue();
     void CreateSwapChain(HWND hwnd);
+    void Renderer::CompileShaderFromFile(
+        const std::wstring& shaderPath, 
+        const std::string& entryPoint,
+        const std::string& target,
+        Microsoft::WRL::ComPtr<ID3DBlob>& shaderBlob,
+        Microsoft::WRL::ComPtr<ID3DBlob>& errorBlob
+    );
 
     void ReleaseResources(); // Clean up resources when no longer needed
 
